@@ -14,6 +14,7 @@ namespace CampusPlacementManagement.Data
 
         // Refresh Token table
         public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<College> Colleges { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

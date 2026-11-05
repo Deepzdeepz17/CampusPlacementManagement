@@ -1,7 +1,10 @@
 using CampusPlacementManagement.Data;
 using CampusPlacementManagement.Data.Seeders;
 using CampusPlacementManagement.Models;
+using CampusPlacementManagement.Repositories;
+using CampusPlacementManagement.Repositories.Interfaces;
 using CampusPlacementManagement.Services;
+using CampusPlacementManagement.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +30,8 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
 // 4. Register JwtService
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<RefreshTokenService>();
+builder.Services.AddScoped<ICollegeRepository, CollegeRepository>();
+builder.Services.AddScoped<ICollegeService, CollegeService>();
 
 // 5. Read JWT configuration
 var jwtIssuer = builder.Configuration["Jwt:Issuer"]
