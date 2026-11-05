@@ -1,3 +1,4 @@
+
 using CampusPlacementManagement.Constants;
 using CampusPlacementManagement.DTOs;
 using CampusPlacementManagement.Enums;
@@ -124,10 +125,8 @@ namespace CampusPlacementManagement.Controllers
             return Ok(new
             {
                 message = "Login successful.",
-
                 accessToken = accessToken,
                 refreshToken = refreshToken,
-
                 accessTokenExpiresInMinutes = expiryMinutes,
 
                 user = new
@@ -137,6 +136,71 @@ namespace CampusPlacementManagement.Controllers
                     email = user.Email,
                     roles = roles
                 }
+            });
+        }
+
+        // POST: api/Auth/refresh
+        [AllowAnonymous]
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh(
+            [FromBody] RefreshTokenDTO refreshTokenDTO)
+        {
+            // 1. Validate the old refresh token and rotate it
+            var result = await _refreshTokenService
+                .RotateRefreshTokenAsync(refreshTokenDTO.RefreshToken);
+
+            // 2. Return 401 if the refresh token is invalid
+            if (result == null)
+            {
+                return Unauthorized(new
+                {
+                    message = "Invalid, expired or revoked refresh token."
+                });
+            }
+
+            // 3. Extract user and newly generated refresh token
+            var (user, newRefreshToken) = result.Value;
+
+            // 4. Generate a new access token
+            var newAccessToken = await _jwtService.GenerateTokenAsync(user);
+
+            // 5. Read access token expiry
+            var expiryMinutes = _configuration
+                .GetValue<int>("Jwt:AccessTokenMinutes");
+
+            // 6. Return the new tokens
+            return Ok(new
+            {
+                message = "Token refreshed successfully.",
+                accessToken = newAccessToken,
+                refreshToken = newRefreshToken,
+                accessTokenExpiresInMinutes = expiryMinutes
+            });
+        }
+
+        // POST: api/Auth/logout
+        [AllowAnonymous]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout(
+            [FromBody] RefreshTokenDTO refreshTokenDTO)
+        {
+            // 1. Revoke the refresh token
+            var isRevoked = await _refreshTokenService
+                .RevokeRefreshTokenAsync(refreshTokenDTO.RefreshToken);
+
+            // 2. Check whether revocation was successful
+            if (!isRevoked)
+            {
+                return Unauthorized(new
+                {
+                    message = "Invalid or already revoked refresh token."
+                });
+            }
+
+            // 3. Return logout confirmation
+            return Ok(new
+            {
+                message = "Logout successful. Refresh token revoked."
             });
         }
     }
