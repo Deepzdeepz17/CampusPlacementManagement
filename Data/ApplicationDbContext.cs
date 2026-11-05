@@ -1,10 +1,12 @@
-﻿using CampusPlacementManagement.Models;
+﻿
+using CampusPlacementManagement.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace CampusPlacementManagement.Data
 {
-    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+    public class ApplicationDbContext
+        : IdentityDbContext<ApplicationUser>
     {
         public ApplicationDbContext(
             DbContextOptions<ApplicationDbContext> options)
@@ -12,29 +14,55 @@ namespace CampusPlacementManagement.Data
         {
         }
 
-        // Refresh Token table
+        // Database tables
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<College> Colleges { get; set; }
+        public DbSet<PlacementOfficer> PlacementOfficers { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
 
-            // Configure RefreshToken relationship
+            // RefreshToken relationship
             builder.Entity<RefreshToken>()
                 .HasOne(rt => rt.User)
                 .WithMany()
                 .HasForeignKey(rt => rt.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Each refresh token hash must be unique
+            // RefreshToken indexes
             builder.Entity<RefreshToken>()
                 .HasIndex(rt => rt.TokenHash)
                 .IsUnique();
 
-            // Index for searching tokens by user
             builder.Entity<RefreshToken>()
                 .HasIndex(rt => rt.UserId);
+
+            // College unique code
+            builder.Entity<College>()
+                .HasIndex(c => c.CollegeCode)
+                .IsUnique();
+
+            // PlacementOfficer - ApplicationUser (one-to-one)
+            builder.Entity<PlacementOfficer>()
+                .HasOne(po => po.User)
+                .WithOne()
+                .HasForeignKey<PlacementOfficer>(po => po.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // College - PlacementOfficer (one-to-many)
+            builder.Entity<PlacementOfficer>()
+                .HasOne(po => po.College)
+                .WithMany()
+                .HasForeignKey(po => po.CollegeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ApplicationUser - Approver (one-to-many)
+            builder.Entity<PlacementOfficer>()
+                .HasOne(po => po.Approver)
+                .WithMany()
+                .HasForeignKey(po => po.ApprovedBy)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }
