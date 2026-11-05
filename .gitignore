@@ -1,0 +1,20 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+
+# Build output
+bin/
+obj/
+
+# NuGet
+*.nupkg
+
+# User-specific files
+*.user
+
+# Logs
+*.log
+
+# Secrets
+appsettings.Production.json
