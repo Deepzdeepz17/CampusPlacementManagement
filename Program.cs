@@ -26,6 +26,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
 
 // 4. Register JwtService
 builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<RefreshTokenService>();
 
 // 5. Read JWT configuration
 var jwtIssuer = builder.Configuration["Jwt:Issuer"]

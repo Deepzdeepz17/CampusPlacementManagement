@@ -1,9 +1,12 @@
+using CampusPlacementManagement.Constants;
 using CampusPlacementManagement.DTOs;
 using CampusPlacementManagement.Enums;
 using CampusPlacementManagement.Models;
 using CampusPlacementManagement.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace CampusPlacementManagement.Controllers
 {
@@ -14,15 +17,55 @@ namespace CampusPlacementManagement.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly JwtService _jwtService;
+        private readonly RefreshTokenService _refreshTokenService;
+        private readonly IConfiguration _configuration;
 
         public AuthController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
-            JwtService jwtService)
+            JwtService jwtService,
+            RefreshTokenService refreshTokenService,
+            IConfiguration configuration)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _jwtService = jwtService;
+            _refreshTokenService = refreshTokenService;
+            _configuration = configuration;
+        }
+
+        // GET: api/Auth/me
+        [Authorize]
+        [HttpGet("me")]
+        public IActionResult GetCurrentUser()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var email = User.FindFirstValue(ClaimTypes.Email);
+            var fullName = User.FindFirstValue(ClaimTypes.Name);
+
+            var roles = User.FindAll(ClaimTypes.Role)
+                            .Select(role => role.Value)
+                            .ToList();
+
+            return Ok(new
+            {
+                message = "Authenticated successfully.",
+                userId,
+                fullName,
+                email,
+                roles
+            });
+        }
+
+        // GET: api/Auth/superadmin-check
+        [Authorize(Roles = Roles.SuperAdmin)]
+        [HttpGet("superadmin-check")]
+        public IActionResult SuperAdminCheck()
+        {
+            return Ok(new
+            {
+                message = "Welcome SuperAdmin! You have access to this endpoint."
+            });
         }
 
         // POST: api/Auth/login
@@ -40,7 +83,7 @@ namespace CampusPlacementManagement.Controllers
                 });
             }
 
-            // 2. Check whether account is approved
+            // 2. Check account status
             if (user.AccountStatus != AccountStatus.Approved)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, new
@@ -63,17 +106,30 @@ namespace CampusPlacementManagement.Controllers
                 });
             }
 
-            // 4. Generate JWT token
-            var token = await _jwtService.GenerateTokenAsync(user);
+            // 4. Generate access token
+            var accessToken = await _jwtService.GenerateTokenAsync(user);
 
-            // 5. Return token and user details
+            // 5. Generate and store refresh token
+            var refreshToken = await _refreshTokenService
+                .CreateRefreshTokenAsync(user);
+
+            // 6. Get user roles
             var roles = await _userManager.GetRolesAsync(user);
 
+            // 7. Read access token expiry
+            var expiryMinutes = _configuration
+                .GetValue<int>("Jwt:AccessTokenMinutes");
+
+            // 8. Return both tokens
             return Ok(new
             {
                 message = "Login successful.",
-                token = token,
-                expirationMinutes = 120,
+
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+
+                accessTokenExpiresInMinutes = expiryMinutes,
+
                 user = new
                 {
                     id = user.Id,
