@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-using System.Text;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -44,6 +43,9 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("JWT key is missing.");
 
+// Convert Base64 JWT key into bytes
+var jwtKeyBytes = Convert.FromBase64String(jwtKey);
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme =
@@ -64,8 +66,8 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
 
-        IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(jwtKey))
+        // Use the same key conversion as JwtService
+        IssuerSigningKey = new SymmetricSecurityKey(jwtKeyBytes)
     };
 });
 
@@ -79,6 +81,9 @@ builder.Services.AddScoped<RefreshTokenService>();
 // 8. College Management - Dependency Injection
 builder.Services.AddScoped<ICollegeRepository, CollegeRepository>();
 builder.Services.AddScoped<ICollegeService, CollegeService>();
+// 10. Student Management - Dependency Injection
+builder.Services.AddScoped<IStudentRepository, StudentRepository>();
+builder.Services.AddScoped<IStudentService, StudentService>();
 
 // 9. Placement Officer Management - Dependency Injection
 builder.Services.AddScoped<

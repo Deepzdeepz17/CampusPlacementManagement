@@ -74,15 +74,16 @@ namespace CampusPlacementManagement.Controllers
         [HttpGet("me")]
         public async Task<IActionResult> GetMyProfile()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
 
             if (userId == null)
                 return Unauthorized();
 
-            var placementOfficer =
+            var officer =
                 await _placementOfficerService.GetByUserIdAsync(userId);
 
-            if (placementOfficer == null)
+            if (officer == null)
             {
                 return NotFound(new
                 {
@@ -90,7 +91,7 @@ namespace CampusPlacementManagement.Controllers
                 });
             }
 
-            return Ok(placementOfficer);
+            return Ok(officer);
         }
 
         // GET: api/placement-officers/{id}
@@ -98,10 +99,10 @@ namespace CampusPlacementManagement.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var placementOfficer =
+            var officer =
                 await _placementOfficerService.GetByIdAsync(id);
 
-            if (placementOfficer == null)
+            if (officer == null)
             {
                 return NotFound(new
                 {
@@ -126,7 +127,7 @@ namespace CampusPlacementManagement.Controllers
                 }
             }
 
-            return Ok(placementOfficer);
+            return Ok(officer);
         }
 
         // PUT: api/placement-officers/{id}/approve
@@ -134,8 +135,8 @@ namespace CampusPlacementManagement.Controllers
         [HttpPut("{id:int}/approve")]
         public async Task<IActionResult> Approve(int id)
         {
-            var approvedByUserId =
-                User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var approvedByUserId = User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
 
             if (approvedByUserId == null)
                 return Unauthorized();

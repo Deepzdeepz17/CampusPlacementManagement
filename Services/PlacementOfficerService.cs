@@ -3,6 +3,7 @@ using CampusPlacementManagement.Constants;
 using CampusPlacementManagement.DTOs;
 using CampusPlacementManagement.Enums;
 using CampusPlacementManagement.Models;
+using CampusPlacementManagement.Repositories;
 using CampusPlacementManagement.Repositories.Interfaces;
 using CampusPlacementManagement.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
@@ -25,23 +26,42 @@ namespace CampusPlacementManagement.Services
             _userManager = userManager;
         }
 
+        // Convert PlacementOfficer entity into response DTO
+        private static PlacementOfficerResponseDTO MapToResponse(
+            PlacementOfficer placementOfficer)
+        {
+            return new PlacementOfficerResponseDTO
+            {
+                PlacementOfficerId = placementOfficer.PlacementOfficerId,
+                FullName = placementOfficer.User?.FullName ?? string.Empty,
+                Email = placementOfficer.User?.Email ?? string.Empty,
+                PhoneNumber = placementOfficer.User?.PhoneNumber ?? string.Empty,
+                CollegeId = placementOfficer.CollegeId,
+                CollegeName = placementOfficer.College?.CollegeName ?? string.Empty,
+                CollegeCode = placementOfficer.College?.CollegeCode ?? string.Empty,
+                Designation = placementOfficer.Designation,
+                Status = placementOfficer.Status,
+                ApprovedAt = placementOfficer.ApprovedAt
+            };
+        }
+
         // Register a new placement officer
-        public async Task<PlacementOfficer> RegisterAsync(
+        public async Task<PlacementOfficerResponseDTO> RegisterAsync(
             RegisterPlacementOfficerDTO placementOfficerDTO)
         {
-            // 1. Check whether the selected college exists
+            // 1. Find the selected college
             var college = await _collegeRepository
                 .GetByIdAsync(placementOfficerDTO.CollegeId);
 
             if (college == null)
                 throw new InvalidOperationException("College not found.");
 
-            // 2. Allow registration only for approved colleges
+            // 2. Check college approval status
             if (college.Status != AccountStatus.Approved)
                 throw new InvalidOperationException(
                     "Placement officer registration is allowed only for approved colleges.");
 
-            // 3. Check whether the email already exists
+            // 3. Check whether email already exists
             var existingUser = await _userManager
                 .FindByEmailAsync(placementOfficerDTO.Email);
 
@@ -52,8 +72,8 @@ namespace CampusPlacementManagement.Services
             // 4. Create Identity user
             var user = new ApplicationUser
             {
-                UserName = placementOfficerDTO.Email,
-                Email = placementOfficerDTO.Email,
+                UserName = placementOfficerDTO.Email.Trim(),
+                Email = placementOfficerDTO.Email.Trim(),
                 FullName = placementOfficerDTO.FullName.Trim(),
                 PhoneNumber = placementOfficerDTO.PhoneNumber,
                 AccountStatus = AccountStatus.Pending,
@@ -61,7 +81,7 @@ namespace CampusPlacementManagement.Services
                 UpdatedAt = DateTime.UtcNow
             };
 
-            // 5. Create the user with the supplied password
+            // 5. Create Identity account
             var identityResult = await _userManager
                 .CreateAsync(user, placementOfficerDTO.Password);
 
@@ -78,42 +98,61 @@ namespace CampusPlacementManagement.Services
             var placementOfficer = new PlacementOfficer
             {
                 UserId = user.Id,
-                CollegeId = placementOfficerDTO.CollegeId,
+                User = user,
+                CollegeId = college.CollegeId,
+                College = college,
                 Designation = placementOfficerDTO.Designation.Trim(),
                 Status = AccountStatus.Pending
             };
 
             await _placementOfficerRepository.AddAsync(placementOfficer);
 
-            // 7. Return the created profile
-            return placementOfficer;
+            // 7. Retrieve saved profile with related information
+            var savedOfficer = await _placementOfficerRepository
+                .GetByUserIdAsync(user.Id);
+
+            if (savedOfficer == null)
+                throw new InvalidOperationException(
+                    "Placement officer profile could not be retrieved.");
+
+            // 8. Return only required information
+            return MapToResponse(savedOfficer);
         }
 
         // Get all placement officers
-        public async Task<List<PlacementOfficer>> GetAllAsync()
+        public async Task<List<PlacementOfficerResponseDTO>> GetAllAsync()
         {
-            return await _placementOfficerRepository.GetAllAsync();
+            var officers = await _placementOfficerRepository.GetAllAsync();
+
+            return officers.Select(MapToResponse).ToList();
         }
 
         // Get placement officer by ID
-        public async Task<PlacementOfficer?> GetByIdAsync(
+        public async Task<PlacementOfficerResponseDTO?> GetByIdAsync(
             int placementOfficerId)
         {
-            return await _placementOfficerRepository
+            var officer = await _placementOfficerRepository
                 .GetByIdAsync(placementOfficerId);
+
+            return officer == null ? null : MapToResponse(officer);
         }
 
         // Get placement officer by Identity User ID
-        public async Task<PlacementOfficer?> GetByUserIdAsync(string userId)
+        public async Task<PlacementOfficerResponseDTO?> GetByUserIdAsync(
+            string userId)
         {
-            return await _placementOfficerRepository
+            var officer = await _placementOfficerRepository
                 .GetByUserIdAsync(userId);
+
+            return officer == null ? null : MapToResponse(officer);
         }
 
         // Get pending placement officers
-        public async Task<List<PlacementOfficer>> GetPendingAsync()
+        public async Task<List<PlacementOfficerResponseDTO>> GetPendingAsync()
         {
-            return await _placementOfficerRepository.GetPendingAsync();
+            var officers = await _placementOfficerRepository.GetPendingAsync();
+
+            return officers.Select(MapToResponse).ToList();
         }
 
         // Approve placement officer
@@ -121,15 +160,14 @@ namespace CampusPlacementManagement.Services
             int placementOfficerId,
             string approvedByUserId)
         {
-            var placementOfficer = await _placementOfficerRepository
+            var officer = await _placementOfficerRepository
                 .GetByIdAsync(placementOfficerId);
 
-            if (placementOfficer == null ||
-                placementOfficer.Status != AccountStatus.Pending)
+            if (officer == null ||
+                officer.Status != AccountStatus.Pending)
                 return false;
 
-            var user = await _userManager
-                .FindByIdAsync(placementOfficer.UserId);
+            var user = await _userManager.FindByIdAsync(officer.UserId);
 
             if (user == null)
                 return false;
@@ -166,12 +204,12 @@ namespace CampusPlacementManagement.Services
                 throw new InvalidOperationException(errors);
             }
 
-            // Update placement officer approval details
-            placementOfficer.Status = AccountStatus.Approved;
-            placementOfficer.ApprovedBy = approvedByUserId;
-            placementOfficer.ApprovedAt = DateTime.UtcNow;
+            // Update officer approval information
+            officer.Status = AccountStatus.Approved;
+            officer.ApprovedBy = approvedByUserId;
+            officer.ApprovedAt = DateTime.UtcNow;
 
-            await _placementOfficerRepository.UpdateAsync(placementOfficer);
+            await _placementOfficerRepository.UpdateAsync(officer);
 
             return true;
         }
@@ -179,26 +217,35 @@ namespace CampusPlacementManagement.Services
         // Reject placement officer
         public async Task<bool> RejectAsync(int placementOfficerId)
         {
-            var placementOfficer = await _placementOfficerRepository
+            var officer = await _placementOfficerRepository
                 .GetByIdAsync(placementOfficerId);
 
-            if (placementOfficer == null ||
-                placementOfficer.Status != AccountStatus.Pending)
+            if (officer == null ||
+                officer.Status != AccountStatus.Pending)
                 return false;
 
-            var user = await _userManager
-                .FindByIdAsync(placementOfficer.UserId);
+            var user = await _userManager.FindByIdAsync(officer.UserId);
 
             if (user == null)
                 return false;
 
-            placementOfficer.Status = AccountStatus.Rejected;
+            officer.Status = AccountStatus.Rejected;
 
             user.AccountStatus = AccountStatus.Rejected;
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _userManager.UpdateAsync(user);
-            await _placementOfficerRepository.UpdateAsync(placementOfficer);
+            var updateResult = await _userManager.UpdateAsync(user);
+
+            if (!updateResult.Succeeded)
+            {
+                var errors = string.Join(
+                    ", ",
+                    updateResult.Errors.Select(e => e.Description));
+
+                throw new InvalidOperationException(errors);
+            }
+
+            await _placementOfficerRepository.UpdateAsync(officer);
 
             return true;
         }
@@ -206,26 +253,35 @@ namespace CampusPlacementManagement.Services
         // Suspend placement officer
         public async Task<bool> SuspendAsync(int placementOfficerId)
         {
-            var placementOfficer = await _placementOfficerRepository
+            var officer = await _placementOfficerRepository
                 .GetByIdAsync(placementOfficerId);
 
-            if (placementOfficer == null ||
-                placementOfficer.Status != AccountStatus.Approved)
+            if (officer == null ||
+                officer.Status != AccountStatus.Approved)
                 return false;
 
-            var user = await _userManager
-                .FindByIdAsync(placementOfficer.UserId);
+            var user = await _userManager.FindByIdAsync(officer.UserId);
 
             if (user == null)
                 return false;
 
-            placementOfficer.Status = AccountStatus.Suspended;
+            officer.Status = AccountStatus.Suspended;
 
             user.AccountStatus = AccountStatus.Suspended;
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _userManager.UpdateAsync(user);
-            await _placementOfficerRepository.UpdateAsync(placementOfficer);
+            var updateResult = await _userManager.UpdateAsync(user);
+
+            if (!updateResult.Succeeded)
+            {
+                var errors = string.Join(
+                    ", ",
+                    updateResult.Errors.Select(e => e.Description));
+
+                throw new InvalidOperationException(errors);
+            }
+
+            await _placementOfficerRepository.UpdateAsync(officer);
 
             return true;
         }
