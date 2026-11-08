@@ -66,7 +66,7 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
 
-        // Use the same key conversion as JwtService
+        // Same key conversion used by JwtService
         IssuerSigningKey = new SymmetricSecurityKey(jwtKeyBytes)
     };
 });
@@ -81,9 +81,6 @@ builder.Services.AddScoped<RefreshTokenService>();
 // 8. College Management - Dependency Injection
 builder.Services.AddScoped<ICollegeRepository, CollegeRepository>();
 builder.Services.AddScoped<ICollegeService, CollegeService>();
-// 10. Student Management - Dependency Injection
-builder.Services.AddScoped<IStudentRepository, StudentRepository>();
-builder.Services.AddScoped<IStudentService, StudentService>();
 
 // 9. Placement Officer Management - Dependency Injection
 builder.Services.AddScoped<
@@ -94,9 +91,21 @@ builder.Services.AddScoped<
     IPlacementOfficerService,
     PlacementOfficerService>();
 
+// 10. Student Management - Dependency Injection
+builder.Services.AddScoped<IStudentRepository, StudentRepository>();
+builder.Services.AddScoped<IStudentService, StudentService>();
+
+// 11. Company Management - Dependency Injection
+builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
+builder.Services.AddScoped<ICompanyService, CompanyService>();
+
+// 12. CompanyHR Management - Dependency Injection
+builder.Services.AddScoped<ICompanyHRRepository, CompanyHRRepository>();
+builder.Services.AddScoped<ICompanyHRService, CompanyHRService>();
+
 var app = builder.Build();
 
-// 10. Configure HTTP request pipeline
+// 13. Configure HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
