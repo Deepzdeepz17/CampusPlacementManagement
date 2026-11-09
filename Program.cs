@@ -102,6 +102,9 @@ builder.Services.AddScoped<ICompanyService, CompanyService>();
 // 12. CompanyHR Management - Dependency Injection
 builder.Services.AddScoped<ICompanyHRRepository, CompanyHRRepository>();
 builder.Services.AddScoped<ICompanyHRService, CompanyHRService>();
+// Job Management
+builder.Services.AddScoped<IJobRepository, JobRepository>();
+builder.Services.AddScoped<IJobService, JobService>();
 
 var app = builder.Build();
 
